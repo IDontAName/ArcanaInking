@@ -470,15 +470,14 @@ function showPreview(pts,callback){
     ctx.clearRect(0,0,gSize,gSize);
     
     // Tolerance corridor
-    ctx.save();ctx.strokeStyle=si.c+'0c';ctx.lineWidth=tol*2;
+    ctx.save();ctx.strokeStyle=si.c+'20';ctx.lineWidth=tol*2;
     ctx.lineCap='round';ctx.lineJoin='round';
     ctx.beginPath();
     for(let i=0;i<=drawn&&i<pts.length;i++)i===0?ctx.moveTo(pts[i].x,pts[i].y):ctx.lineTo(pts[i].x,pts[i].y);
     ctx.stroke();ctx.restore();
     
     // Main line
-    ctx.save();ctx.shadowColor=si.g;ctx.shadowBlur=6;
-    ctx.strokeStyle=si.c+'55';ctx.lineWidth=2.5;
+    ctx.save();ctx.strokeStyle=si.g;ctx.lineWidth=2.5;
     ctx.lineCap='round';ctx.lineJoin='round';
     ctx.beginPath();
     for(let i=0;i<=drawn&&i<pts.length;i++)i===0?ctx.moveTo(pts[i].x,pts[i].y):ctx.lineTo(pts[i].x,pts[i].y);
@@ -505,35 +504,40 @@ function drawTracePath(pts){
   const ctx=document.getElementById('cPath').getContext('2d');
   ctx.clearRect(0,0,gSize,gSize);
   const si=SU[cur.suit],tol=getTol();
-  // Corridor
-  ctx.save();ctx.strokeStyle=si.c+'0c';ctx.lineWidth=tol*2;
+  // Tolerance corridor
+  ctx.save();ctx.strokeStyle=si.c+'20';ctx.lineWidth=tol*2;
   ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
   pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
   ctx.stroke();ctx.restore();
-  // Line
-  ctx.save();ctx.shadowColor=si.g;ctx.shadowBlur=6;
-  ctx.strokeStyle=si.c+'55';ctx.lineWidth=2.5;
-  ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
-  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-  ctx.stroke();ctx.restore();
-  // Dashed guide
-  ctx.save();ctx.setLineDash([3,5]);ctx.strokeStyle=si.g+'30';ctx.lineWidth=1;
+  // Guide line — visible but muted
+  ctx.save();ctx.strokeStyle=si.c+'70';ctx.lineWidth=2;
+  ctx.lineCap='round';ctx.lineJoin='round';
   ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
   ctx.stroke();ctx.restore();
-  // Start marker
+  // Start marker — bright
   const sp=pts[0];ctx.save();ctx.shadowColor=si.g;ctx.shadowBlur=14;
   ctx.fillStyle=si.g;ctx.beginPath();ctx.arc(sp.x,sp.y,7,0,Math.PI*2);ctx.fill();ctx.restore();
 }
 function sm(pts,sub){if(pts.length<3)return pts;const r=[];for(let i=0;i<pts.length-1;i++){const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[Math.min(pts.length-1,i+1)],p3=pts[Math.min(pts.length-1,i+2)];for(let j=0;j<sub;j++){const t=j/sub,t2=t*t,t3=t2*t;r.push({x:.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),y:.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)})}}r.push(pts[pts.length-1]);return r}
 
 /* ═══ CANVAS ═══ */
-function initC(){const w=document.getElementById('gW'),rect=w.getBoundingClientRect();gSize=Math.floor(Math.min(rect.width,rect.height));const dpr=window.devicePixelRatio||1;['cBg','cPath','cDraw','cUi'].forEach(id=>{const c=document.getElementById(id);c.width=gSize*dpr;c.height=gSize*dpr;c.style.width=gSize+'px';c.style.height=gSize+'px';c.getContext('2d').setTransform(dpr,0,0,dpr,0,0)})}
+function initC(){const w=document.getElementById('gW');w.offsetHeight;const rect=w.getBoundingClientRect();gSize=Math.max(100,Math.floor(Math.min(rect.width,rect.height)));const dpr=window.devicePixelRatio||1;['cBg','cPath','cDraw','cUi'].forEach(id=>{const c=document.getElementById(id);c.width=gSize*dpr;c.height=gSize*dpr;c.style.width=gSize+'px';c.style.height=gSize+'px';c.getContext('2d').setTransform(dpr,0,0,dpr,0,0)})}
 function drawBg(){const ctx=document.getElementById('cBg').getContext('2d'),s=gSize;ctx.fillStyle='#171728';ctx.fillRect(0,0,s,s);for(let i=0;i<1200;i++){ctx.fillStyle=`rgba(${135+Math.random()*25},${125+Math.random()*25},${108+Math.random()*25},${.012+Math.random()*.012})`;ctx.fillRect(Math.random()*s,Math.random()*s,1+Math.random(),1+Math.random())}if(typeof CARD_IMAGES!=='undefined'&&CARD_IMAGES[cur.ik]){const img=new Image();img.onload=()=>{ctx.globalAlpha=.08;const ch=s*.6,cw=ch*(img.naturalWidth/img.naturalHeight);ctx.drawImage(img,(s-cw)/2,(s-ch)/2,cw,ch);ctx.globalAlpha=1};img.src=CARD_IMAGES[cur.ik]}const si=SU[cur.suit];[[14,14],[s-14,14],[14,s-14],[s-14,s-14]].forEach(([x,y])=>{ctx.fillStyle=si.c+'28';ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fill()})}
 function cPos(e){const c=document.getElementById('cDraw'),r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*(gSize/r.width),y:(e.clientY-r.top)*(gSize/r.height)}}
 function clrInput(){const cv=document.getElementById('cDraw');cv.onpointerdown=cv.onpointermove=cv.onpointerup=cv.onpointerleave=null;cv.style.cursor='default'}
 
 /* ═══ GAME FLOW ═══ */
-function startInk(card){cur=card;phRes=[];go('game');document.getElementById('gN').textContent=card.name;document.getElementById('gN').className='gn s'+card.suit.charAt(0);document.getElementById('gReq').textContent=card.thresh+'%';phases=getChallenges(card);phIdx=-1;initC();drawBg();nextPh()}
+function startInk(card){
+  cur=card;phRes=[];go('game');
+  document.getElementById('gN').textContent=card.name;
+  document.getElementById('gN').className='gn s'+card.suit.charAt(0);
+  document.getElementById('gReq').textContent=card.thresh+'%';
+  phases=getChallenges(card);phIdx=-1;
+  // Delay canvas init by a frame so the browser has laid out the game screen
+  requestAnimationFrame(()=>{
+    initC();drawBg();nextPh();
+  });
+}
 function nextPh(){
   phIdx++;if(phIdx>=phases.length){showRes();return}
   const ct=phases[phIdx];
@@ -577,7 +581,32 @@ function hTrace(pos){const ctx=document.getElementById('cDraw').getContext('2d')
     const d=Math.hypot(pos.x-s.pts[i].x,pos.y-s.pts[i].y);
     if(d<minD){minD=d;ni=i}
   }
-  const on=minD<=tol,q=on?Math.max(0,1-minD/tol):0;if(s.lp){ctx.save();if(on){const w=2+q*3;ctx.strokeStyle=si.g;ctx.shadowColor=si.g;ctx.shadowBlur=8*q;ctx.lineWidth=w;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle=`rgba(255,255,255,${.12+q*.2})`;ctx.lineWidth=w*.3;ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke()}else{ctx.strokeStyle='rgba(200,80,80,.3)';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke()}ctx.restore()}if(on&&ni>=s.pi){for(let i=s.pi;i<ni;i++)s.covDist=(s.covDist||0)+Math.hypot(s.pts[i+1].x-s.pts[i].x,s.pts[i+1].y-s.pts[i].y);s.pi=ni}else if(!on)s.off+=minD*.008;document.getElementById('gF').style.width=Math.min(100,(s.pi/(s.pts.length-1))*100)+'%';document.getElementById('sA').textContent=Math.round(Math.max(0,100-s.off))+'%';
+  const on=minD<=tol,q=on?Math.max(0,1-minD/tol):0;
+  if(s.lp){
+    ctx.save();
+    if(on){
+      // Bright visible ink — outer glow
+      const w=3+q*4;
+      ctx.strokeStyle=si.g;
+      ctx.shadowColor=si.g;
+      ctx.shadowBlur=12;
+      ctx.lineWidth=w;
+      ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
+      // White core for visibility
+      ctx.shadowBlur=0;
+      ctx.strokeStyle='rgba(255,255,255,.7)';
+      ctx.lineWidth=Math.max(2,w*.45);
+      ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
+    } else {
+      // Off-path: red and visible
+      ctx.strokeStyle='rgba(255,60,60,.6)';
+      ctx.lineWidth=2.5;
+      ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
+    }
+    ctx.restore();
+  }if(on&&ni>=s.pi){for(let i=s.pi;i<ni;i++)s.covDist=(s.covDist||0)+Math.hypot(s.pts[i+1].x-s.pts[i].x,s.pts[i+1].y-s.pts[i].y);s.pi=ni}else if(!on)s.off+=minD*.008;document.getElementById('gF').style.width=Math.min(100,(s.pi/(s.pts.length-1))*100)+'%';document.getElementById('sA').textContent=Math.round(Math.max(0,100-s.off))+'%';
   // Only auto-finish when genuinely at the end (last 2 points AND 90%+ through)
   if(s.pi>=s.pts.length-2&&s.pi/(s.pts.length-1)>=.9)finTrace()}
 function finTrace(){cSt.dr=false;const a=Math.max(0,Math.min(100,100-cSt.off)),c=Math.min(100,(cSt.pi/(cSt.pts.length-1))*100);phRes.push({type:CT.TRACE,acc:a,comp:c,time:(Date.now()-cSt.st)/1000});clrInput();setTimeout(nextPh,400)}
