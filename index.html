@@ -186,7 +186,7 @@ function buildGrid(){
 
 /* ═══ SIGILS — multi-stroke designs, each stroke is a distinct element ═══ */
 function genSigil(card,sz){
-  const cx=sz/2,cy=sz/2,u=sz*.42;
+  const cx=sz/2,cy=sz/2,u=sz*.85;
   const d=cDiff();
   const designs=buildDesigns(card.suit,card.rank,d,cx,cy,u,sz);
   const pick=designs[Math.floor(Math.random()*designs.length)];
@@ -206,7 +206,7 @@ function buildDesigns(suit,rank,d,cx,cy,u,sz){
 // Design A and Design B are alternatives randomly chosen.
 
 function wandSigils(r,d,cx,cy,u,sz){
-  const R=u*.85;const designs=[];
+  const R=u*.52;const designs=[];
   // A: N individual flame wands radiating out, each its own stroke
   {const strokes=[];const n=Math.min(r<=10?r:r-3,8);
   for(let i=0;i<n;i++){
@@ -243,7 +243,7 @@ function wandSigils(r,d,cx,cy,u,sz){
 }
 
 function cupSigils(r,d,cx,cy,u,sz){
-  const R=u*.85;const designs=[];
+  const R=u*.52;const designs=[];
   // A: Chalice body (stroke 1) + water inside (stroke 2) + base decoration (stroke 3)
   {const strokes=[];const w=R*.5,h=R*1.1;const by=cy+h*.3;
   // Stroke 1: bowl outline
@@ -270,7 +270,7 @@ function cupSigils(r,d,cx,cy,u,sz){
 }
 
 function swordSigils(r,d,cx,cy,u,sz){
-  const R=u*.85;const designs=[];
+  const R=u*.52;const designs=[];
   // A: Blade (stroke 1) + crossguard (stroke 2) + grip+pommel (stroke 3)
   {const strokes=[];const bh=R*1.4,bw=R*.07,gw=R*.32;
   // Stroke 1: blade edges (tip → right → back to tip → left)
@@ -297,7 +297,7 @@ function swordSigils(r,d,cx,cy,u,sz){
 }
 
 function coinSigils(r,d,cx,cy,u,sz){
-  const R=u*.7;const designs=[];
+  const R=u*.45;const designs=[];
   // A: Outer ring (stroke 1) + pentagram star (stroke 2) + inner ring (stroke 3)
   {const strokes=[];const notches=Math.min(r,10);
   // Stroke 1: notched outer circle
@@ -328,7 +328,7 @@ function coinSigils(r,d,cx,cy,u,sz){
 }
 
 function majorSigils(r,d,cx,cy,u,sz){
-  const R=u*.85;const designs=[];
+  const R=u*.52;const designs=[];
   const mk={
   0:()=>[// Fool: spiral path (stroke 1) + cliff edge (stroke 2) + sun rays (stroke 3)
     bez(cx-R*.5,cy+R*.4,cx-R*.2,cy+R*.1,cx+R*.2,cy+R*.3,cx+R*.4,cy,12).concat(
@@ -476,7 +476,7 @@ function showPreview(strokes,callback){
       ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
       for(let i=0;i<toDraw;i++)i===0?ctx.moveTo(stroke[i].x,stroke[i].y):ctx.lineTo(stroke[i].x,stroke[i].y);
       ctx.stroke();ctx.restore();
-      ctx.save();ctx.strokeStyle=si.g;ctx.lineWidth=2.5;
+      ctx.save();ctx.strokeStyle=si.g;ctx.lineWidth=1.5;
       ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
       for(let i=0;i<toDraw;i++)i===0?ctx.moveTo(stroke[i].x,stroke[i].y):ctx.lineTo(stroke[i].x,stroke[i].y);
       ctx.stroke();ctx.restore();
@@ -612,13 +612,11 @@ function advanceStroke(){
   drawTraceStrokes(s.strokes,s.strokeIdx);
 }
 
-function getTol(){const base=Math.max(6,22-cur.thresh*.18);const dex=Math.max(0,dexMod)*1.5;return Math.max(5,base+dex)}
+function getTol(){const base=Math.max(5,12-cur.thresh*.06);const dex=Math.max(0,dexMod)*1;return Math.max(4,base+dex)}
 function hTrace(pos){const ctx=document.getElementById('cDraw').getContext('2d'),si=SU[cur.suit],s=cSt,tol=getTol();
-  // Search forward only, wider window for smoother tracking
+  // Search entire remaining path — points are dense so this is fast
   let minD=1e9,ni=s.pi;
-  const searchAhead=Math.min(25,s.pts.length-s.pi);
-  for(let i=s.pi;i<s.pi+searchAhead;i++){
-    if(i>=s.pts.length)break;
+  for(let i=s.pi;i<s.pts.length;i++){
     const d=Math.hypot(pos.x-s.pts[i].x,pos.y-s.pts[i].y);
     if(d<minD){minD=d;ni=i}
   }
@@ -626,23 +624,21 @@ function hTrace(pos){const ctx=document.getElementById('cDraw').getContext('2d')
   if(s.lp){
     ctx.save();
     if(on){
-      // Bright visible ink — outer glow
-      const w=3+q*4;
+      const w=1.5+q*2.5;
       ctx.strokeStyle=si.g;
       ctx.shadowColor=si.g;
-      ctx.shadowBlur=12;
+      ctx.shadowBlur=6;
       ctx.lineWidth=w;
       ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
-      // White core for visibility
       ctx.shadowBlur=0;
-      ctx.strokeStyle='rgba(255,255,255,.7)';
-      ctx.lineWidth=Math.max(2,w*.45);
+      ctx.strokeStyle='rgba(255,255,255,.6)';
+      ctx.lineWidth=Math.max(1,w*.35);
       ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
     } else {
       // Off-path: red and visible
-      ctx.strokeStyle='rgba(255,60,60,.6)';
-      ctx.lineWidth=2.5;
+      ctx.strokeStyle='rgba(255,60,60,.5)';
+      ctx.lineWidth=1.5;
       ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
     }
