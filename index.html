@@ -184,340 +184,275 @@ function buildGrid(){
   });
 }
 
-/* ═══ SIGILS — single continuous stroke, no loops ═══ */
+/* ═══ SIGILS — multi-stroke designs, each stroke is a distinct element ═══ */
 function genSigil(card,sz){
-  const cx=sz/2,cy=sz/2,m=sz*.1,u=sz-m*2;
-  const s=card.suit,r=card.rank,d=cDiff();
-  let pts;
-  if(s==='wands') pts=sigWand(r,d,cx,cy,u,sz);
-  else if(s==='cups') pts=sigCup(r,d,cx,cy,u,sz);
-  else if(s==='swords') pts=sigSword(r,d,cx,cy,u,sz);
-  else if(s==='coins') pts=sigCoin(r,d,cx,cy,u,sz);
-  else pts=sigMajor(r,d,cx,cy,u,sz);
-  // Ensure no duplicate consecutive points
-  const clean=[pts[0]];
-  for(let i=1;i<pts.length;i++){
-    if(Math.hypot(pts[i].x-clean[clean.length-1].x,pts[i].y-clean[clean.length-1].y)>1)
-      clean.push(pts[i]);
-  }
-  return sm(clean,3);
+  const cx=sz/2,cy=sz/2,u=sz*.42;
+  const d=cDiff();
+  const designs=buildDesigns(card.suit,card.rank,d,cx,cy,u,sz);
+  const pick=designs[Math.floor(Math.random()*designs.length)];
+  // pick is an array of stroke arrays — smooth each
+  return pick.map(s=>s.length>=3?sm(s,4):s).filter(s=>s.length>=2);
+}
+function P(x,y){return{x,y}}
+function arc(ox,oy,r,a1,a2,n){const p=[];for(let i=0;i<=n;i++){const t=i/n;const a=a1+(a2-a1)*t;p.push(P(ox+Math.cos(a)*r,oy+Math.sin(a)*r))}return p}
+function bez(x0,y0,x1,y1,x2,y2,x3,y3,n){const p=[];for(let i=0;i<=n;i++){const t=i/n;const q=1-t;p.push(P(q*q*q*x0+3*q*q*t*x1+3*q*t*t*x2+t*t*t*x3,q*q*q*y0+3*q*q*t*y1+3*q*t*t*y2+t*t*t*y3))}return p}
+
+function buildDesigns(suit,rank,d,cx,cy,u,sz){
+  if(suit==='major')return majorSigils(rank,d,cx,cy,u,sz);
+  return{wands:wandSigils,cups:cupSigils,swords:swordSigils,coins:coinSigils}[suit](rank,d,cx,cy,u,sz);
 }
 
-// WANDS: vertical staff with leaves branching off alternating sides, fire tip
-function sigWand(r,d,cx,cy,u,sz){
-  const pts=[];
-  const top=sz*.1,bot=sz*.88;
-  const branches=Math.min(r<=10?r:r-6,8);
-  const bLen=u*(.06+d*.04);
-  // Draw from bottom to top
-  const steps=20+Math.floor(d*20);
-  for(let i=0;i<=steps;i++){
-    const t=i/steps;
-    const y=bot-(bot-top)*t;
-    const wobble=Math.sin(t*Math.PI*2)*u*.008;
-    pts.push({x:cx+wobble,y});
-    // At branch points, detour out and back
-    const bIdx=Math.floor(t*branches);
-    const bT=t*branches-bIdx;
-    if(bT>=0.4&&bT<0.6&&bIdx<branches){
-      const dir=bIdx%2===0?1:-1;
-      const bx=cx+dir*bLen*(1+bIdx*.1);
-      const by=y-bLen*.4;
-      pts.push({x:bx*.7+cx*.3,y:(y+by)/2});
-      pts.push({x:bx,y:by});
-      pts.push({x:bx*.7+cx*.3,y:(y+by)/2});
-      pts.push({x:cx+wobble,y}); // return to shaft
-    }
-  }
-  // Fire tip
-  pts.push({x:cx-u*.03,y:top-u*.02});
-  pts.push({x:cx,y:top-u*.06});
-  pts.push({x:cx+u*.03,y:top-u*.02});
-  pts.push({x:cx,y:top});
-  return pts;
+// Each design is an array of strokes. Each stroke is an array of points.
+// Design A and Design B are alternatives randomly chosen.
+
+function wandSigils(r,d,cx,cy,u,sz){
+  const R=u*.85;const designs=[];
+  // A: N individual flame wands radiating out, each its own stroke
+  {const strokes=[];const n=Math.min(r<=10?r:r-3,8);
+  for(let i=0;i<n;i++){
+    const a=(i/n)*Math.PI*2-Math.PI/2;const len=R*(.5+r*.02);
+    const ex=cx+Math.cos(a)*len,ey=cy+Math.sin(a)*len;
+    const perp=a+Math.PI/2;
+    // Each wand is a curved stroke with a flame tip
+    const s=[...bez(cx+Math.cos(a)*R*.1,cy+Math.sin(a)*R*.1,
+      cx+Math.cos(a)*len*.4+Math.cos(perp)*R*.08,cy+Math.sin(a)*len*.4+Math.sin(perp)*R*.08,
+      cx+Math.cos(a)*len*.7-Math.cos(perp)*R*.05,cy+Math.sin(a)*len*.7-Math.sin(perp)*R*.05,
+      ex,ey,10)];
+    // Flame flick at tip
+    s.push(P(ex+Math.cos(a+.4)*R*.1,ey+Math.sin(a+.4)*R*.1));
+    s.push(P(ex+Math.cos(a)*R*.15,ey+Math.sin(a)*R*.15));
+    s.push(P(ex+Math.cos(a-.4)*R*.1,ey+Math.sin(a-.4)*R*.1));
+    strokes.push(s);
+  }designs.push(strokes)}
+  // B: Two strokes — serpentine flame pillar + crown burst
+  {const strokes=[];
+  // Stroke 1: flame pillar
+  const s1=[];const segs=15+r*3;
+  for(let i=0;i<=segs;i++){const t=i/segs;const y=cy+R-R*2*t;
+    s1.push(P(cx+Math.sin(t*Math.PI*(2.5+r*.3))*R*(.08+t*.2),y))}
+  strokes.push(s1);
+  // Stroke 2: crown/burst at top
+  const s2=[];const tips=Math.max(3,Math.min(r,7));
+  for(let i=0;i<tips;i++){
+    const a=-Math.PI*.8+i*(Math.PI*.6/(tips-1));const tr=R*(.12+r*.015);
+    s2.push(P(cx,cy-R));
+    s2.push(...bez(cx,cy-R,cx+Math.cos(a)*tr*.4,cy-R-tr*.6,cx+Math.cos(a)*tr,cy-R-tr*.9,cx+Math.cos(a)*tr*.8,cy-R-tr*.3,5));
+  }strokes.push(s2);
+  designs.push(strokes)}
+  return designs;
 }
 
-// CUPS: chalice outline — base, stem, bowl traced in one stroke
-function sigCup(r,d,cx,cy,u,sz){
-  const pts=[];
-  const w=u*(.15+d*.05),h=u*(.35+d*.05);
-  const baseY=cy+h*.5,stemH=h*.25,bowlH=h*.5;
-  // Base left to right
-  pts.push({x:cx-w*.6,y:baseY});
-  pts.push({x:cx+w*.6,y:baseY});
-  // Up stem right side
-  pts.push({x:cx+w*.12,y:baseY});
-  pts.push({x:cx+w*.12,y:baseY-stemH});
-  // Bowl right side up and around
-  const bowlSegs=12+Math.floor(d*12);
-  for(let i=0;i<=bowlSegs;i++){
-    const t=i/bowlSegs;
-    const a=-Math.PI/2+t*Math.PI; // right side up to left side
-    pts.push({x:cx+Math.cos(a)*w,y:baseY-stemH-bowlH*.5+Math.sin(a)*bowlH*.5});
-  }
-  // Down stem left side
-  pts.push({x:cx-w*.12,y:baseY-stemH});
-  pts.push({x:cx-w*.12,y:baseY});
-  // Water waves inside (higher rank = more waves)
-  if(r>=3){
-    const waves=Math.min(r-1,5);
-    for(let wv=0;wv<waves;wv++){
-      const wy=baseY-stemH-bowlH*.3-wv*h*.06;
-      const ww=w*(.4+wv*.05);
-      for(let i=0;i<=8;i++){
-        const t=i/8;
-        pts.push({x:cx-ww+t*ww*2,y:wy+Math.sin(t*Math.PI*2)*h*.03});
-      }
-    }
-  }
-  return pts;
+function cupSigils(r,d,cx,cy,u,sz){
+  const R=u*.85;const designs=[];
+  // A: Chalice body (stroke 1) + water inside (stroke 2) + base decoration (stroke 3)
+  {const strokes=[];const w=R*.5,h=R*1.1;const by=cy+h*.3;
+  // Stroke 1: bowl outline
+  strokes.push([...bez(cx-w*.4,by-h*.25,cx-w*.5,by-h*.45,cx-w*.35,by-h*.7,cx-w*.1,by-h*.72,10),
+    ...bez(cx-w*.1,by-h*.72,cx+w*.1,by-h*.74,cx+w*.35,by-h*.7,cx+w*.4,by-h*.45,10),
+    P(cx+w*.4,by-h*.25)]);
+  // Stroke 2: stem + base
+  strokes.push([P(cx,by-h*.25),P(cx,by-h*.05),
+    ...bez(cx,by-h*.05,cx-w*.15,by,cx-w*.35,by+h*.02,cx-w*.4,by+h*.05,6),
+    P(cx+w*.4,by+h*.05),
+    ...bez(cx+w*.4,by+h*.05,cx+w*.35,by+h*.02,cx+w*.15,by,cx,by-h*.05,6)]);
+  // Stroke 3: water waves (more for higher rank)
+  if(r>=2){const s3=[];const waves=Math.min(r,6);
+    for(let wv=0;wv<waves;wv++){const wy=by-h*(.35+wv*.05);const ww=w*(.2+wv*.02);
+      for(let i=0;i<=10;i++){const t=i/10;s3.push(P(cx-ww+t*ww*2,wy+Math.sin(t*Math.PI*2.5+wv)*h*.015))}}
+    strokes.push(s3)}
+  designs.push(strokes)}
+  // B: N cascading water streams, each its own stroke
+  {const strokes=[];const n=Math.min(r<=10?r:r-3,6);
+  for(let i=0;i<n;i++){const sx=cx+(i-(n-1)/2)*R*.22;const bend=(i%2?1:-1)*R*.12;
+    strokes.push(bez(sx,cy-R*.55,sx+bend,cy-R*.15,sx-bend*.6,cy+R*.2,sx+bend*.4,cy+R*.55,14))}
+  designs.push(strokes)}
+  return designs;
 }
 
-// SWORDS: blade outline traced as one continuous path — tip, edges, crossguard, pommel
-function sigSword(r,d,cx,cy,u,sz){
-  const pts=[];
-  const bh=u*(.35+d*.05),bw=u*(.03+d*.01);
-  const guardW=u*(.1+d*.03);
-  // Start at tip
-  pts.push({x:cx,y:cy-bh});
-  // Right edge down
-  pts.push({x:cx+bw,y:cy-bh*.3});
-  // Crossguard right
-  pts.push({x:cx+guardW,y:cy-bh*.22});
-  pts.push({x:cx+guardW,y:cy-bh*.16});
-  // Back to blade
-  pts.push({x:cx+bw,y:cy-bh*.16});
-  // Down to grip
-  pts.push({x:cx+bw*.8,y:cy+bh*.15});
-  // Pommel
-  pts.push({x:cx+bw*1.5,y:cy+bh*.2});
-  pts.push({x:cx,y:cy+bh*.25});
-  pts.push({x:cx-bw*1.5,y:cy+bh*.2});
-  // Back up left side
-  pts.push({x:cx-bw*.8,y:cy+bh*.15});
-  pts.push({x:cx-bw,y:cy-bh*.16});
-  // Crossguard left
-  pts.push({x:cx-guardW,y:cy-bh*.16});
-  pts.push({x:cx-guardW,y:cy-bh*.22});
-  // Left edge to tip
-  pts.push({x:cx-bw,y:cy-bh*.3});
-  pts.push({x:cx,y:cy-bh});
-  // Fuller line down center for higher ranks
-  if(r>=4){
-    pts.push({x:cx,y:cy-bh*.85});
-    pts.push({x:cx,y:cy-bh*.05});
-  }
-  // Crown detail for court cards
-  if(r>=11){
-    const crW=guardW*.5;
-    pts.push({x:cx,y:cy-bh});
-    pts.push({x:cx-crW,y:cy-bh*1.08});
-    pts.push({x:cx,y:cy-bh*1.15});
-    pts.push({x:cx+crW,y:cy-bh*1.08});
-    pts.push({x:cx,y:cy-bh});
-  }
-  return pts;
+function swordSigils(r,d,cx,cy,u,sz){
+  const R=u*.85;const designs=[];
+  // A: Blade (stroke 1) + crossguard (stroke 2) + grip+pommel (stroke 3)
+  {const strokes=[];const bh=R*1.4,bw=R*.07,gw=R*.32;
+  // Stroke 1: blade edges (tip → right → back to tip → left)
+  strokes.push([P(cx,cy-bh*.45),...bez(cx,cy-bh*.45,cx+bw*1.5,cy-bh*.3,cx+bw,cy-bh*.1,cx+bw*.8,cy-bh*.02,8),
+    P(cx-bw*.8,cy-bh*.02),...bez(cx-bw*.8,cy-bh*.02,cx-bw,cy-bh*.1,cx-bw*1.5,cy-bh*.3,cx,cy-bh*.45,8)]);
+  // Stroke 2: crossguard with decorative curls
+  strokes.push([...bez(cx-gw,cy-bh*.04,cx-gw*.7,cy-bh*.07,cx-gw*.3,cy-bh*.05,cx,cy-bh*.03,6),
+    ...bez(cx,cy-bh*.03,cx+gw*.3,cy-bh*.05,cx+gw*.7,cy-bh*.07,cx+gw,cy-bh*.04,6),
+    ...arc(cx+gw,cy-bh*.04,R*.04,-.3,Math.PI*.7,4)]);
+  // Stroke 3: grip + pommel
+  const s3=[P(cx,cy-bh*.02)];
+  const wraps=3+Math.floor(r*.2);
+  for(let i=0;i<=wraps;i++){const t=i/wraps;s3.push(P(cx+(i%2?bw*.5:-bw*.5),cy+bh*t*.14))}
+  s3.push(...arc(cx,cy+bh*.16,bw*1.5,-.2,Math.PI+.2,6));
+  strokes.push(s3);
+  designs.push(strokes)}
+  // B: N parallel blades, each its own stroke
+  {const strokes=[];const n=Math.min(r<=10?r:r-3,8);const spacing=R*1.5/Math.max(1,n-1);const sx=cx-R*.75;
+  for(let i=0;i<n;i++){const x=n===1?cx:sx+i*spacing;const h=R*(.7+Math.sin(i*.8)*.1);
+    strokes.push([P(x,cy-h),P(x-R*.02,cy-h*.3),P(x+R*.02,cy+h*.3),P(x,cy+h*.1),
+      P(x-R*.04,cy+h*.15),P(x+R*.04,cy+h*.15),P(x,cy+h*.1)])}
+  designs.push(strokes)}
+  return designs;
 }
 
-// COINS: pentacle — outer circle then star, all one stroke
-function sigCoin(r,d,cx,cy,u,sz){
-  const pts=[];
-  const R=u*(.25+d*.06);
-  // Circle (3/4 of it — don't fully close to avoid overlap)
-  const circSegs=20+Math.floor(d*15);
-  for(let i=0;i<=circSegs;i++){
-    const t=i/circSegs;
-    const a=t*Math.PI*1.85-Math.PI/2; // ~330 degrees, not full
-    pts.push({x:cx+Math.cos(a)*R,y:cy+Math.sin(a)*R});
-  }
-  // Pentagram as one continuous stroke (the "draw a star without lifting pen" path)
-  if(r>=2){
-    const starR=R*.75;
-    const order=[0,2,4,1,3]; // skip-one pattern
-    // Move from last circle point to first star point
-    const a0=(order[0]/5)*Math.PI*2-Math.PI/2;
-    pts.push({x:cx+Math.cos(a0)*starR,y:cy+Math.sin(a0)*starR});
-    for(let i=1;i<order.length;i++){
-      const a=(order[i]/5)*Math.PI*2-Math.PI/2;
-      pts.push({x:cx+Math.cos(a)*starR,y:cy+Math.sin(a)*starR});
-    }
-    // Close star back to first point
-    pts.push({x:cx+Math.cos(a0)*starR,y:cy+Math.sin(a0)*starR});
-  }
-  // Inner details for high ranks
-  if(r>=8){
-    const r2=R*.4;
-    for(let i=0;i<=5;i++){
-      const a=(i/5)*Math.PI*2-Math.PI/2;
-      pts.push({x:cx+Math.cos(a)*r2,y:cy+Math.sin(a)*r2});
-    }
-  }
-  return pts;
+function coinSigils(r,d,cx,cy,u,sz){
+  const R=u*.7;const designs=[];
+  // A: Outer ring (stroke 1) + pentagram star (stroke 2) + inner ring (stroke 3)
+  {const strokes=[];const notches=Math.min(r,10);
+  // Stroke 1: notched outer circle
+  const s1=[];const segs=28+r*2;
+  for(let i=0;i<=segs;i++){const t=i/segs;const a=t*Math.PI*1.92-Math.PI/2;
+    const n2=Math.sin(t*Math.PI*notches*2)*.015*R;
+    s1.push(P(cx+Math.cos(a)*(R+n2),cy+Math.sin(a)*(R+n2)))}
+  strokes.push(s1);
+  // Stroke 2: pentagram (if rank >= 2)
+  if(r>=2){const sR=R*.65;const order=[0,2,4,1,3,0];const s2=[];
+    for(let i=0;i<order.length;i++){const a=(order[i]/5)*Math.PI*2-Math.PI/2;
+      s2.push(P(cx+Math.cos(a)*sR,cy+Math.sin(a)*sR))}
+    strokes.push(s2)}
+  // Stroke 3: inner ring (rank >= 5)
+  if(r>=5){strokes.push(arc(cx,cy,R*.35,0,Math.PI*1.85,14))}
+  designs.push(strokes)}
+  // B: N individual coin circles, each its own stroke
+  {const strokes=[];const n=Math.min(r<=10?r:r-3,10);const cR=R*.12;
+  const positions=[];
+  if(n<=3){for(let i=0;i<n;i++)positions.push(P(cx+(i-(n-1)/2)*R*.5,cy))}
+  else{const rows=Math.ceil(n/3);let idx=0;
+    for(let row=0;row<rows&&idx<n;row++){const cnt=Math.min(3,n-idx);
+      for(let c=0;c<cnt;c++){positions.push(P(cx+(c-(cnt-1)/2)*R*.45,cy-R*.45+row*R*.4));idx++}}}
+  for(const pos of positions){
+    strokes.push(arc(pos.x,pos.y,cR,-Math.PI/2,Math.PI*1.5,10))}
+  designs.push(strokes)}
+  return designs;
 }
 
-// MAJOR: unique symbol per card, never loops
-function sigMajor(r,d,cx,cy,u,sz){
-  const pts=[];
-  const R=u*.3;
-  const sym=r%7;
-  if(sym===0){
-    // Spiral outward (Fool, Chariot, Temperance)
-    const turns=2+d;
-    const segs=30+Math.floor(d*30);
-    for(let i=0;i<=segs;i++){
-      const t=i/segs;
-      const a=t*Math.PI*2*turns;
-      const rad=R*.08+t*R*.9;
-      pts.push({x:cx+Math.cos(a)*rad,y:cy+Math.sin(a)*rad});
-    }
-  } else if(sym===1){
-    // Lightning bolt (Magician, Strength, Tower)
-    const segs=6+Math.floor(d*6);
-    let y=cy-R;
-    for(let i=0;i<segs;i++){
-      const dir=i%2===0?1:-1;
-      const xOff=dir*R*(.3+Math.random()*.2);
-      pts.push({x:cx+xOff,y});
-      y+=R*2/segs;
-    }
-    pts.push({x:cx,y:cy+R});
-  } else if(sym===2){
-    // Eye shape (Priestess, Fortune, Moon)
-    const segs=20+Math.floor(d*15);
-    // Top lid
-    for(let i=0;i<=segs;i++){
-      const t=i/segs;
-      pts.push({x:cx-R*.8+t*R*1.6,y:cy-Math.sin(t*Math.PI)*R*.35});
-    }
-    // Bottom lid back
-    for(let i=segs;i>=0;i--){
-      const t=i/segs;
-      pts.push({x:cx-R*.8+t*R*1.6,y:cy+Math.sin(t*Math.PI)*R*.35});
-    }
-    // Pupil circle
-    const pSegs=12;
-    const pR=R*.12;
-    for(let i=0;i<=pSegs;i++){
-      const t=i/pSegs;
-      const a=t*Math.PI*1.9; // not fully closed
-      pts.push({x:cx+Math.cos(a)*pR,y:cy+Math.sin(a)*pR});
-    }
-  } else if(sym===3){
-    // Ankh / cross with loop (Empress, Hanged Man, Sun)
-    // Top loop
-    const loopR=R*.2;
-    for(let i=0;i<=16;i++){
-      const t=i/16;
-      const a=t*Math.PI*1.8-Math.PI*.9;
-      pts.push({x:cx+Math.cos(a)*loopR,y:cy-R*.4+Math.sin(a)*loopR});
-    }
-    // Vertical bar down
-    pts.push({x:cx,y:cy-R*.2});
-    pts.push({x:cx,y:cy+R*.6});
-    // Horizontal bar
-    pts.push({x:cx,y:cy});
-    pts.push({x:cx-R*.35,y:cy});
-    pts.push({x:cx+R*.35,y:cy});
-  } else if(sym===4){
-    // Serpentine S-curve (Emperor, Devil, Judgement)
-    const segs=30+Math.floor(d*25);
-    for(let i=0;i<=segs;i++){
-      const t=i/segs;
-      pts.push({
-        x:cx+Math.sin(t*Math.PI*3)*R*.5,
-        y:cy-R+t*R*2
-      });
-    }
-  } else if(sym===5){
-    // Triquetra/trefoil (Hierophant, Star)
-    const segs=20;
-    for(let lobe=0;lobe<3;lobe++){
-      const baseA=lobe*Math.PI*2/3-Math.PI/2;
-      const lcx=cx+Math.cos(baseA)*R*.25;
-      const lcy=cy+Math.sin(baseA)*R*.25;
-      for(let i=0;i<=segs;i++){
-        const t=i/segs;
-        const a=baseA+t*Math.PI*1.3;
-        pts.push({x:lcx+Math.cos(a)*R*.35,y:lcy+Math.sin(a)*R*.35});
-      }
-    }
-  } else {
-    // Arrow/chevron pattern (Lovers, Death)
-    const chevrons=3+Math.floor(d*3);
-    for(let c=0;c<chevrons;c++){
-      const yBase=cy-R+c*(R*2/chevrons);
-      const w=R*(.5-c*.03);
-      pts.push({x:cx-w,y:yBase});
-      pts.push({x:cx,y:yBase+R*.15});
-      pts.push({x:cx+w,y:yBase});
-    }
-  }
-  return pts;
+function majorSigils(r,d,cx,cy,u,sz){
+  const R=u*.85;const designs=[];
+  const mk={
+  0:()=>[// Fool: spiral path (stroke 1) + cliff edge (stroke 2) + sun rays (stroke 3)
+    bez(cx-R*.5,cy+R*.4,cx-R*.2,cy+R*.1,cx+R*.2,cy+R*.3,cx+R*.4,cy,12).concat(
+      bez(cx+R*.4,cy,cx+R*.2,cy-R*.3,cx-R*.1,cy-R*.2,cx-R*.3,cy-R*.4,12)),
+    [P(cx+R*.3,cy-R*.2),P(cx+R*.5,cy),P(cx+R*.55,cy+R*.5),P(cx+R*.3,cy+R*.5)],
+    arc(cx-R*.25,cy-R*.5,R*.15,Math.PI*.2,Math.PI*1.8,10).concat(
+      [P(cx-R*.25,cy-R*.5-R*.15),P(cx-R*.25,cy-R*.5-R*.28),P(cx-R*.25+R*.12,cy-R*.5-R*.22)])],
+  1:()=>[// Magician: infinity (stroke 1) + wand (stroke 2) + table with elements (stroke 3)
+    (()=>{const s=[];for(let i=0;i<=35;i++){const t=i/35;const a=t*Math.PI*2;s.push(P(cx+Math.sin(a)*R*.4,cy-R*.35+Math.sin(a*2)*R*.15))}return s})(),
+    [P(cx,cy-R*.18),P(cx-R*.01,cy+R*.05),P(cx+R*.01,cy+R*.3),P(cx,cy+R*.45)],
+    [P(cx-R*.5,cy+R*.3),P(cx+R*.5,cy+R*.3),P(cx+R*.5,cy+R*.35),P(cx-R*.5,cy+R*.35)]],
+  2:()=>[// High Priestess: left pillar (s1) + right pillar (s2) + veil drape (s3) + crescent (s4)
+    [P(cx-R*.35,cy+R*.45),P(cx-R*.35,cy-R*.35),P(cx-R*.3,cy-R*.42),P(cx-R*.4,cy-R*.42),P(cx-R*.35,cy-R*.35)],
+    [P(cx+R*.35,cy+R*.45),P(cx+R*.35,cy-R*.35),P(cx+R*.3,cy-R*.42),P(cx+R*.4,cy-R*.42),P(cx+R*.35,cy-R*.35)],
+    bez(cx-R*.3,cy-R*.35,cx-R*.1,cy-R*.1,cx+R*.1,cy-R*.2,cx+R*.3,cy-R*.35,16),
+    arc(cx,cy-R*.52,R*.1,Math.PI*.3,Math.PI*1.7,8)],
+  3:()=>[// Empress: venus circle (s1) + cross below (s2) + grain wreath (s3)
+    arc(cx,cy-R*.15,R*.22,0,Math.PI*1.9,14),
+    [P(cx,cy+R*.08),P(cx,cy+R*.5),P(cx,cy+R*.3),P(cx-R*.18,cy+R*.3),P(cx+R*.18,cy+R*.3)],
+    (()=>{const s=[];for(let i=0;i<10;i++){const a=(i/10)*Math.PI*2;const wr=R*.32;const wx=cx+Math.cos(a)*wr,wy=cy-R*.15+Math.sin(a)*wr;s.push(P(wx,wy));s.push(P(wx+Math.cos(a)*R*.08,wy+Math.sin(a)*R*.08))}return s})()],
+  4:()=>[// Emperor: throne sides (s1) + crown (s2) + ram horns (s3)
+    [P(cx-R*.5,cy+R*.4),P(cx-R*.5,cy-R*.1),P(cx+R*.5,cy-R*.1),P(cx+R*.5,cy+R*.4)],
+    [P(cx-R*.3,cy-R*.1),P(cx-R*.25,cy-R*.4),P(cx-R*.1,cy-R*.28),P(cx,cy-R*.48),P(cx+R*.1,cy-R*.28),P(cx+R*.25,cy-R*.4),P(cx+R*.3,cy-R*.1)],
+    bez(cx-R*.5,cy-R*.1,cx-R*.65,cy-R*.35,cx-R*.55,cy-R*.55,cx-R*.35,cy-R*.42,10).concat(
+      [P(cx-R*.5,cy-R*.1),...bez(cx+R*.5,cy-R*.1,cx+R*.65,cy-R*.35,cx+R*.55,cy-R*.55,cx+R*.35,cy-R*.42,10)])],
+  5:()=>[// Hierophant: vertical staff (s1) + three crossbars (s2) + acolytes (s3)
+    [P(cx,cy-R*.6),P(cx,cy+R*.45)],
+    [P(cx-R*.1,cy-R*.45),P(cx+R*.1,cy-R*.45),P(cx+R*.1,cy-R*.45),P(cx,cy-R*.45),
+     P(cx-R*.18,cy-R*.25),P(cx+R*.18,cy-R*.25),P(cx+R*.18,cy-R*.25),P(cx,cy-R*.25),
+     P(cx-R*.28,cy-R*.05),P(cx+R*.28,cy-R*.05)],
+    bez(cx-R*.4,cy+R*.35,cx-R*.3,cy+R*.15,cx-R*.18,cy+R*.1,cx-R*.1,cy+R*.2,6).concat(
+      bez(cx+R*.1,cy+R*.2,cx+R*.18,cy+R*.1,cx+R*.3,cy+R*.15,cx+R*.4,cy+R*.35,6))],
+  6:()=>[// Lovers: left wing (s1) + right wing (s2) + two figures (s3) + halo (s4)
+    bez(cx,cy-R*.45,cx-R*.25,cy-R*.65,cx-R*.55,cy-R*.5,cx-R*.5,cy-R*.25,10),
+    bez(cx,cy-R*.45,cx+R*.25,cy-R*.65,cx+R*.55,cy-R*.5,cx+R*.5,cy-R*.25,10),
+    bez(cx-R*.2,cy+R*.4,cx-R*.15,cy+R*.1,cx-R*.1,cy-R*.05,cx-R*.15,cy-R*.2,8).concat(
+      bez(cx+R*.15,cy-R*.2,cx+R*.1,cy-R*.05,cx+R*.15,cy+R*.1,cx+R*.2,cy+R*.4,8)),
+    arc(cx,cy-R*.5,R*.07,0,Math.PI*1.85,6)],
+  7:()=>[// Chariot: left wheel (s1) + right wheel (s2) + chariot body (s3) + canopy (s4)
+    arc(cx-R*.35,cy+R*.3,R*.13,0,Math.PI*1.85,10),
+    arc(cx+R*.35,cy+R*.3,R*.13,0,Math.PI*1.85,10),
+    [P(cx-R*.25,cy+R*.15),P(cx-R*.3,cy-R*.05),P(cx+R*.3,cy-R*.05),P(cx+R*.25,cy+R*.15)],
+    bez(cx-R*.32,cy-R*.08,cx-R*.2,cy-R*.38,cx+R*.2,cy-R*.38,cx+R*.32,cy-R*.08,12)],
+  8:()=>[// Strength: infinity (s1) + lion body curves (s2) + mane (s3) + tail (s4)
+    (()=>{const s=[];for(let i=0;i<=25;i++){const t=i/25;const a=t*Math.PI*2;s.push(P(cx+Math.sin(a)*R*.25,cy-R*.45+Math.sin(a*2)*R*.1))}return s})(),
+    bez(cx-R*.35,cy+R*.05,cx-R*.2,cy+R*.25,cx+R*.15,cy+R*.3,cx+R*.35,cy+R*.15,12),
+    bez(cx-R*.35,cy+R*.05,cx-R*.5,cy-R*.1,cx-R*.45,cy+R*.2,cx-R*.25,cy+R*.3,10).concat(
+      bez(cx-R*.25,cy+R*.3,cx-R*.1,cy+R*.35,cx+R*.05,cy+R*.25,cx+R*.2,cy+R*.15,8)),
+    bez(cx+R*.3,cy+R*.25,cx+R*.45,cy+R*.35,cx+R*.5,cy+R*.45,cx+R*.35,cy+R*.42,8)],
+  9:()=>[// Hermit: staff (s1) + lantern (s2) + light rays (s3) + mountain path (s4)
+    bez(cx+R*.12,cy+R*.45,cx+R*.08,cy+R*.15,cx-R*.04,cy-R*.1,cx-R*.08,cy-R*.38,10),
+    [P(cx-R*.08,cy-R*.38),P(cx-R*.08+R*.08,cy-R*.28),P(cx-R*.08,cy-R*.18),P(cx-R*.08-R*.08,cy-R*.28),P(cx-R*.08,cy-R*.38)],
+    (()=>{const s=[];const lx=cx-R*.08,ly=cy-R*.38;for(let i=0;i<6;i++){const a=-Math.PI*.7+i*.28;s.push(P(lx,ly));s.push(P(lx+Math.cos(a)*R*.13,ly+Math.sin(a)*R*.13))}return s})(),
+    bez(cx-R*.45,cy+R*.45,cx-R*.2,cy+R*.25,cx+R*.1,cy+R*.4,cx+R*.35,cy+R*.2,10).concat(
+      bez(cx+R*.35,cy+R*.2,cx+R*.45,cy+R*.1,cx+R*.3,cy+R*.3,cx+R*.2,cy+R*.45,8))],
+  10:()=>[// Wheel: outer ring (s1) + inner ring (s2) + spokes (s3) + corner symbols (s4)
+    arc(cx,cy,R*.42,0,Math.PI*1.92,20),
+    arc(cx,cy,R*.22,Math.PI*1.9,0.05,14),
+    (()=>{const s=[];for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;s.push(P(cx+Math.cos(a)*R*.22,cy+Math.sin(a)*R*.22));s.push(P(cx+Math.cos(a)*R*.41,cy+Math.sin(a)*R*.41))}return s})(),
+    (()=>{const s=[];for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2-Math.PI/2;s.push(...arc(cx+Math.cos(a)*R*.55,cy+Math.sin(a)*R*.55,R*.05,0,Math.PI*1.8,5))}return s})()],
+  11:()=>[// Justice: sword (s1) + beam (s2) + left scale (s3) + right scale (s4)
+    [P(cx,cy-R*.55),P(cx,cy+R*.1)],
+    [P(cx-R*.45,cy-R*.12),P(cx+R*.45,cy-R*.2)],
+    [P(cx-R*.45,cy-R*.12),P(cx-R*.48,cy+R*.05),...arc(cx-R*.45,cy+R*.08,R*.1,-Math.PI*.2,Math.PI*1.2,7)],
+    [P(cx+R*.45,cy-R*.2),P(cx+R*.42,cy-R*.02),...arc(cx+R*.45,cy+R*.02,R*.1,-Math.PI*.2,Math.PI*1.2,7)]],
+  12:()=>[// Hanged Man: crossbeam (s1) + rope (s2) + figure (s3) + halo (s4)
+    [P(cx-R*.35,cy-R*.45),P(cx+R*.35,cy-R*.45)],
+    bez(cx,cy-R*.45,cx-R*.04,cy-R*.35,cx+R*.04,cy-R*.2,cx,cy-R*.1,8),
+    [P(cx-R*.12,cy-R*.32),P(cx,cy-R*.08),P(cx+R*.12,cy-R*.18),P(cx,cy-R*.08),P(cx,cy+R*.05)],
+    arc(cx,cy+R*.15,R*.09,0,Math.PI*1.85,8)],
+  13:()=>[// Death: scythe blade (s1) + handle (s2) + rose (s3) + fallen crown (s4)
+    bez(cx-R*.45,cy-R*.15,cx-R*.25,cy-R*.55,cx+R*.2,cy-R*.45,cx+R*.4,cy-R*.1,14),
+    bez(cx+R*.4,cy-R*.1,cx+R*.25,cy+R*.15,cx,cy+R*.3,cx-R*.15,cy+R*.45,10),
+    (()=>{const s=[];const rx=cx-R*.3,ry=cy+R*.2;for(let i=0;i<5;i++){const a=(i/5)*Math.PI*2-Math.PI/2;s.push(P(rx,ry));s.push(...arc(rx+Math.cos(a)*R*.05,ry+Math.sin(a)*R*.05,R*.05,a-.8,a+.8,3))}return s})(),
+    [P(cx+R*.1,cy+R*.3),P(cx+R*.15,cy+R*.22),P(cx+R*.22,cy+R*.3),P(cx+R*.28,cy+R*.22),P(cx+R*.35,cy+R*.3)]],
+  14:()=>[// Temperance: left wing (s1) + right wing (s2) + cups + flow (s3) + halo (s4)
+    bez(cx,cy-R*.25,cx-R*.2,cy-R*.5,cx-R*.5,cy-R*.4,cx-R*.5,cy-R*.15,10),
+    bez(cx,cy-R*.25,cx+R*.2,cy-R*.5,cx+R*.5,cy-R*.4,cx+R*.5,cy-R*.15,10),
+    arc(cx-R*.25,cy+R*.08,R*.07,-Math.PI*.3,Math.PI*1.3,5).concat(
+      bez(cx-R*.18,cy+R*.04,cx-R*.08,cy-R*.02,cx+R*.08,cy+R*.15,cx+R*.18,cy+R*.04,10),
+      arc(cx+R*.25,cy+R*.08,R*.07,-Math.PI*.3,Math.PI*1.3,5)),
+    arc(cx,cy-R*.35,R*.06,0,Math.PI*1.85,6)],
+  15:()=>[// Devil: left horn (s1) + right horn (s2) + inverted pentagram (s3) + chains (s4)
+    bez(cx-R*.08,cy-R*.15,cx-R*.25,cy-R*.45,cx-R*.45,cy-R*.5,cx-R*.4,cy-R*.3,8),
+    bez(cx+R*.08,cy-R*.15,cx+R*.25,cy-R*.45,cx+R*.45,cy-R*.5,cx+R*.4,cy-R*.3,8),
+    (()=>{const sR=R*.35;const order=[2,4,1,3,0,2];const s=[];for(const idx of order){const a=(idx/5)*Math.PI*2+Math.PI/2;s.push(P(cx+Math.cos(a)*sR,cy+Math.sin(a)*sR))}return s})(),
+    [P(cx-R*.3,cy+R*.15),P(cx-R*.32,cy+R*.22),P(cx-R*.28,cy+R*.3),P(cx-R*.32,cy+R*.38),
+     P(cx+R*.3,cy+R*.15),P(cx+R*.32,cy+R*.22),P(cx+R*.28,cy+R*.3),P(cx+R*.32,cy+R*.38)]],
+  16:()=>[// Tower: tower body (s1) + lightning (s2) + crown flying (s3) + falling figure (s4)
+    [P(cx-R*.12,cy+R*.45),P(cx-R*.12,cy-R*.2),P(cx-R*.16,cy-R*.25),P(cx-R*.05,cy-R*.32),P(cx+R*.05,cy-R*.32),P(cx+R*.16,cy-R*.25),P(cx+R*.12,cy-R*.2),P(cx+R*.12,cy+R*.45)],
+    [P(cx+R*.05,cy-R*.3),P(cx+R*.2,cy-R*.5),P(cx+R*.08,cy-R*.42),P(cx+R*.3,cy-R*.6),P(cx+R*.12,cy-R*.52),P(cx+R*.35,cy-R*.7)],
+    bez(cx-R*.15,cy-R*.35,cx-R*.3,cy-R*.5,cx-R*.35,cy-R*.45,cx-R*.28,cy-R*.32,6),
+    bez(cx-R*.25,cy-R*.05,cx-R*.4,cy+R*.15,cx-R*.45,cy+R*.3,cx-R*.35,cy+R*.42,8)],
+  17:()=>[// Star: big 8-point star (s1) + 7 small stars (s2) + left stream (s3) + right stream (s4)
+    (()=>{const s=[];for(let i=0;i<=16;i++){const a=(i/16)*Math.PI*2-Math.PI/2;const rad=i%2===0?R*.42:R*.17;s.push(P(cx+Math.cos(a)*rad,cy-R*.15+Math.sin(a)*rad))}return s})(),
+    (()=>{const s=[];for(let j=0;j<7;j++){const sa=(j/7)*Math.PI*2;const sx=cx+Math.cos(sa)*R*.58,sy=cy-R*.15+Math.sin(sa)*R*.48;for(let i=0;i<=4;i++){const a=(i/4)*Math.PI*2;const rad=i%2===0?R*.05:R*.02;s.push(P(sx+Math.cos(a)*rad,sy+Math.sin(a)*rad))}}return s})(),
+    bez(cx-R*.18,cy+R*.1,cx-R*.28,cy+R*.28,cx-R*.22,cy+R*.45,cx-R*.32,cy+R*.55,10),
+    bez(cx+R*.08,cy+R*.12,cx+R*.12,cy+R*.3,cx+R*.04,cy+R*.45,cx+R*.18,cy+R*.55,10)],
+  18:()=>[// Moon: crescent (s1) + left tower (s2) + right tower (s3) + winding path (s4)
+    arc(cx,cy-R*.42,R*.18,Math.PI*.3,Math.PI*1.7,10).concat(arc(cx+R*.07,cy-R*.42,R*.12,Math.PI*1.5,Math.PI*.5,7)),
+    [P(cx-R*.4,cy+R*.15),P(cx-R*.4,cy-R*.1),P(cx-R*.36,cy-R*.16),P(cx-R*.44,cy-R*.16),P(cx-R*.4,cy-R*.1)],
+    [P(cx+R*.4,cy+R*.15),P(cx+R*.4,cy-R*.1),P(cx+R*.36,cy-R*.16),P(cx+R*.44,cy-R*.16),P(cx+R*.4,cy-R*.1)],
+    bez(cx,cy+R*.45,cx-R*.12,cy+R*.28,cx+R*.12,cy+R*.12,cx,cy-R*.02,12)],
+  19:()=>[// Sun: sun circle (s1) + rays (s2) + left flower (s3) + right flower (s4)
+    arc(cx,cy-R*.28,R*.18,0,Math.PI*1.9,12),
+    (()=>{const s=[];for(let i=0;i<10;i++){const a=(i/10)*Math.PI*2;s.push(P(cx+Math.cos(a)*R*.2,cy-R*.28+Math.sin(a)*R*.2));s.push(P(cx+Math.cos(a)*R*.45,cy-R*.28+Math.sin(a)*R*.45))}return s})(),
+    [P(cx-R*.3,cy+R*.5),P(cx-R*.3,cy+R*.28),...arc(cx-R*.3,cy+R*.28,R*.07,0,Math.PI*1.8,6)],
+    [P(cx+R*.3,cy+R*.5),P(cx+R*.3,cy+R*.28),...arc(cx+R*.3,cy+R*.28,R*.07,0,Math.PI*1.8,6)]],
+  20:()=>[// Judgement: trumpet (s1) + left wing (s2) + right wing (s3) + three rising figures (s4+s5+s6)
+    bez(cx-R*.08,cy-R*.45,cx,cy-R*.4,cx+R*.15,cy-R*.32,cx+R*.3,cy-R*.18,8).concat(arc(cx+R*.3,cy-R*.18,R*.05,-Math.PI*.3,Math.PI*.3,3)),
+    bez(cx-R*.08,cy-R*.38,cx-R*.3,cy-R*.55,cx-R*.45,cy-R*.42,cx-R*.4,cy-R*.2,8),
+    bez(cx-R*.08,cy-R*.38,cx+R*.12,cy-R*.55,cx+R*.25,cy-R*.42,cx+R*.22,cy-R*.2,8),
+    [P(cx-R*.22,cy+R*.45),P(cx-R*.22,cy+R*.15),P(cx-R*.28,cy+R*.1),P(cx-R*.16,cy+R*.1)],
+    [P(cx,cy+R*.45),P(cx,cy+R*.15),P(cx-R*.06,cy+R*.1),P(cx+R*.06,cy+R*.1)],
+    [P(cx+R*.22,cy+R*.45),P(cx+R*.22,cy+R*.15),P(cx+R*.16,cy+R*.1),P(cx+R*.28,cy+R*.1)]]
+  };
+  const fn=mk[r]||mk[0];
+  designs.push(fn());
+  // Mirror variant
+  designs.push(fn().map(stroke=>stroke.map(p=>P(cx-(p.x-cx),p.y))));
+  return designs;
 }
 
-/* ═══ Preview trace animation ═══ */
-function showPreview(pts,callback){
-  const ctx=document.getElementById('cPath').getContext('2d');
-  const si=SU[cur.suit],tol=getTol();
-  const durationMs=3000; // 3 seconds
-  const startT=performance.now();
-  
-  function drawFrame(now){
-    const elapsed=now-startT;
-    const t=Math.min(1,elapsed/durationMs);
-    const drawn=Math.floor(t*pts.length);
-    
-    ctx.clearRect(0,0,gSize,gSize);
-    
-    // Tolerance corridor
-    ctx.save();ctx.strokeStyle=si.c+'20';ctx.lineWidth=tol*2;
-    ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.beginPath();
-    for(let i=0;i<=drawn&&i<pts.length;i++)i===0?ctx.moveTo(pts[i].x,pts[i].y):ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.stroke();ctx.restore();
-    
-    // Main line
-    ctx.save();ctx.strokeStyle=si.g;ctx.lineWidth=2.5;
-    ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.beginPath();
-    for(let i=0;i<=drawn&&i<pts.length;i++)i===0?ctx.moveTo(pts[i].x,pts[i].y):ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.stroke();ctx.restore();
-    
-    // Moving dot
-    if(drawn<pts.length){
-      const p=pts[drawn];
-      ctx.save();ctx.fillStyle=si.g;ctx.shadowColor=si.g;ctx.shadowBlur=10;
-      ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.restore();
-    }
-    
-    if(t<1){
-      af=requestAnimationFrame(drawFrame);
-    } else {
-      drawTracePath(pts);
-      callback();
-    }
-  }
-  af=requestAnimationFrame(drawFrame);
-}
 
-function drawTracePath(pts){
-  const ctx=document.getElementById('cPath').getContext('2d');
-  ctx.clearRect(0,0,gSize,gSize);
-  const si=SU[cur.suit],tol=getTol();
-  // Tolerance corridor
-  ctx.save();ctx.strokeStyle=si.c+'20';ctx.lineWidth=tol*2;
-  ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
-  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-  ctx.stroke();ctx.restore();
-  // Guide line — visible but muted
-  ctx.save();ctx.strokeStyle=si.c+'70';ctx.lineWidth=2;
-  ctx.lineCap='round';ctx.lineJoin='round';
-  ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-  ctx.stroke();ctx.restore();
-  // Start marker — bright
-  const sp=pts[0];ctx.save();ctx.shadowColor=si.g;ctx.shadowBlur=14;
-  ctx.fillStyle=si.g;ctx.beginPath();ctx.arc(sp.x,sp.y,7,0,Math.PI*2);ctx.fill();ctx.restore();
-}
 function sm(pts,sub){if(pts.length<3)return pts;const r=[];for(let i=0;i<pts.length-1;i++){const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[Math.min(pts.length-1,i+1)],p3=pts[Math.min(pts.length-1,i+2)];for(let j=0;j<sub;j++){const t=j/sub,t2=t*t,t3=t2*t;r.push({x:.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),y:.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)})}}r.push(pts[pts.length-1]);return r}
 
 /* ═══ CANVAS ═══ */
@@ -533,10 +468,19 @@ function startInk(card){
   document.getElementById('gN').className='gn s'+card.suit.charAt(0);
   document.getElementById('gReq').textContent=card.thresh+'%';
   phases=getChallenges(card);phIdx=-1;
-  // Delay canvas init by a frame so the browser has laid out the game screen
-  requestAnimationFrame(()=>{
-    initC();drawBg();nextPh();
-  });
+  // Wait for layout to be ready — retry until canvas container has real dimensions
+  function tryInit(){
+    const w=document.getElementById('gW');
+    const rect=w.getBoundingClientRect();
+    if(rect.width>50&&rect.height>50){
+      initC();drawBg();nextPh();
+    } else {
+      // Layout not ready yet, try again
+      setTimeout(tryInit,30);
+    }
+  }
+  // Double rAF to give browser 2 frames, then check
+  requestAnimationFrame(()=>requestAnimationFrame(tryInit));
 }
 function nextPh(){
   phIdx++;if(phIdx>=phases.length){showRes();return}
@@ -553,24 +497,62 @@ function nextPh(){
 
 /* ═══ TRACE ═══ */
 function startTrace(){
-  const pts=genSigil(cur,gSize);
-  const s=cSt={t:CT.TRACE,pts,dr:false,pi:0,lp:null,off:0,td:0,st:0,buf:[]};
-  for(let i=1;i<s.pts.length;i++){const dx=s.pts[i].x-s.pts[i-1].x,dy=s.pts[i].y-s.pts[i-1].y;s.td+=Math.sqrt(dx*dx+dy*dy)}
-  document.getElementById('gI').textContent='Watch the path...';
-  // Show preview animation, then enable input
-  showPreview(pts,()=>{
-    document.getElementById('gI').textContent='Start at the bright point.';
+  const strokes=genSigil(cur,gSize);
+  const s=cSt={t:CT.TRACE,strokes,strokeIdx:0,
+    pts:strokes[0],dr:false,pi:0,lp:null,off:0,td:0,st:0,buf:[],
+    totalStrokes:strokes.length,strokesDone:0,totalOff:0};
+  // Total distance across all strokes
+  for(const stroke of strokes)for(let i=1;i<stroke.length;i++){const dx=stroke[i].x-stroke[i-1].x,dy=stroke[i].y-stroke[i-1].y;s.td+=Math.sqrt(dx*dx+dy*dy)}
+  document.getElementById('gI').textContent='';
+  showPreview(strokes,()=>{
+    document.getElementById('gI').textContent=strokes.length>1?`Stroke 1 / ${strokes.length}`:'';
     setupTraceInput(s);
     af=requestAnimationFrame(animTr);
   });
 }
 function setupTraceInput(s){
   const cv=document.getElementById('cDraw');cv.style.cursor='crosshair';
-  cv.onpointerdown=e=>{e.preventDefault();const p=cPos(e);if(!s.dr){if(Math.hypot(p.x-s.pts[0].x,p.y-s.pts[0].y)<28){s.dr=true;s.st=Date.now();s.lp=p;s.buf=[p];const ctx=document.getElementById('cDraw').getContext('2d');ctx.save();ctx.fillStyle=SU[cur.suit].g;ctx.shadowColor=SU[cur.suit].g;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();ctx.restore()}}else{s.lp=p;s.buf=[p]}};
-  cv.onpointermove=e=>{e.preventDefault();if(!s.dr)return;const p=cPos(e);s.buf.push(p);if(s.buf.length>5)s.buf.shift();const avg={x:s.buf.reduce((a,b)=>a+b.x,0)/s.buf.length,y:s.buf.reduce((a,b)=>a+b.y,0)/s.buf.length};hTrace(avg);s.lp=avg};
-  cv.onpointerup=e=>{e.preventDefault();if(s.dr&&s.pi>=s.pts.length*.75)finTrace();else if(s.dr)s.off+=5;s.buf=[]};
-  cv.onpointerleave=()=>{s.buf=[]};
+  cv.onpointerdown=e=>{e.preventDefault();const p=cPos(e);
+    if(!s.dr){
+      if(Math.hypot(p.x-s.pts[0].x,p.y-s.pts[0].y)<28){
+        s.dr=true;if(!s.st)s.st=Date.now();s.lp=p;s.buf=[p];
+        const ctx=document.getElementById('cDraw').getContext('2d');
+        ctx.save();ctx.fillStyle=SU[cur.suit].g;ctx.shadowColor=SU[cur.suit].g;ctx.shadowBlur=10;
+        ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+    } else {s.lp=p;s.buf=[p]}
+  };
+  cv.onpointermove=e=>{e.preventDefault();if(!s.dr)return;const p=cPos(e);
+    s.buf.push(p);if(s.buf.length>5)s.buf.shift();
+    const avg={x:s.buf.reduce((a,b)=>a+b.x,0)/s.buf.length,y:s.buf.reduce((a,b)=>a+b.y,0)/s.buf.length};
+    hTrace(avg);s.lp=avg};
+  cv.onpointerup=e=>{e.preventDefault();
+    if(s.dr&&s.pi>=s.pts.length*.7)advanceStroke();
+    else if(s.dr)s.off+=3;
+    s.dr=false;s.buf=[]};
+  cv.onpointerleave=()=>{s.dr=false;s.buf=[]};
 }
+
+function advanceStroke(){
+  const s=cSt;
+  s.totalOff+=s.off;
+  s.strokesDone++;
+  s.strokeIdx++;
+  
+  if(s.strokeIdx>=s.strokes.length){
+    // All strokes done
+    finTrace();return;
+  }
+  
+  // Set up next stroke
+  s.pts=s.strokes[s.strokeIdx];
+  s.pi=0;s.off=0;s.dr=false;s.lp=null;s.buf=[];
+  document.getElementById('gI').textContent=`Stroke ${s.strokeIdx+1} / ${s.totalStrokes}`;
+  
+  // Redraw guide with current stroke's start highlighted
+  drawTraceStrokes(s.strokes,s.strokeIdx);
+}
+
 function getTol(){const base=Math.max(6,22-cur.thresh*.18);const dex=Math.max(0,dexMod)*1.5;return Math.max(5,base+dex)}
 function hTrace(pos){const ctx=document.getElementById('cDraw').getContext('2d'),si=SU[cur.suit],s=cSt,tol=getTol();
   // Search forward only, wider window for smoother tracking
@@ -606,11 +588,23 @@ function hTrace(pos){const ctx=document.getElementById('cDraw').getContext('2d')
       ctx.beginPath();ctx.moveTo(s.lp.x,s.lp.y);ctx.lineTo(pos.x,pos.y);ctx.stroke();
     }
     ctx.restore();
-  }if(on&&ni>=s.pi){for(let i=s.pi;i<ni;i++)s.covDist=(s.covDist||0)+Math.hypot(s.pts[i+1].x-s.pts[i].x,s.pts[i+1].y-s.pts[i].y);s.pi=ni}else if(!on)s.off+=minD*.008;document.getElementById('gF').style.width=Math.min(100,(s.pi/(s.pts.length-1))*100)+'%';document.getElementById('sA').textContent=Math.round(Math.max(0,100-s.off))+'%';
+  }if(on&&ni>=s.pi){for(let i=s.pi;i<ni;i++)s.covDist=(s.covDist||0)+Math.hypot(s.pts[i+1].x-s.pts[i].x,s.pts[i+1].y-s.pts[i].y);s.pi=ni}else if(!on)s.off+=minD*.008;
+  const pct=Math.min(100,(s.pi/(s.pts.length-1))*100);
+  document.getElementById('gF').style.width=pct+'%';
+  document.getElementById('sA').textContent=Math.round(Math.max(0,100-s.off))+'%';
   // Only auto-finish when genuinely at the end (last 2 points AND 90%+ through)
-  if(s.pi>=s.pts.length-2&&s.pi/(s.pts.length-1)>=.9)finTrace()}
-function finTrace(){cSt.dr=false;const a=Math.max(0,Math.min(100,100-cSt.off)),c=Math.min(100,(cSt.pi/(cSt.pts.length-1))*100);phRes.push({type:CT.TRACE,acc:a,comp:c,time:(Date.now()-cSt.st)/1000});clrInput();setTimeout(nextPh,400)}
-function animTr(){const uc=document.getElementById('cUi').getContext('2d');uc.clearRect(0,0,gSize,gSize);const si=SU[cur.suit],s=cSt,t=Date.now();if(!s.dr&&s.pi===0){const sp=s.pts[0],p=.4+Math.sin(t/280)*.6;uc.save();uc.fillStyle=si.g+Math.floor(p*50).toString(16).padStart(2,'0');uc.beginPath();uc.arc(sp.x,sp.y,11+p*5,0,Math.PI*2);uc.fill();uc.restore()}if(s.dr&&s.st)document.getElementById('sT').textContent=((Date.now()-s.st)/1000).toFixed(1)+'s';if(cSt.t===CT.TRACE)af=requestAnimationFrame(animTr)}
+  if(s.pi>=s.pts.length-2&&s.pi/(s.pts.length-1)>=.9)advanceStroke()}
+function finTrace(){cSt.dr=false;const s=cSt;const totalOff=s.totalOff+s.off;const a=Math.max(0,Math.min(100,100-totalOff));const totalPts=s.strokes.reduce((sum,st)=>sum+st.length,0);const donePts=s.strokes.slice(0,s.strokeIdx).reduce((sum,st)=>sum+st.length,0)+s.pi;const c=Math.min(100,(donePts/totalPts)*100);phRes.push({type:CT.TRACE,acc:a,comp:c,time:(Date.now()-s.st)/1000});clrInput();setTimeout(nextPh,400)}
+function animTr(){const uc=document.getElementById('cUi').getContext('2d');uc.clearRect(0,0,gSize,gSize);const si=SU[cur.suit],s=cSt,t=Date.now();
+  if(!s.dr&&s.pi===0){const sp=s.pts[0],p=.4+Math.sin(t/280)*.6;
+    uc.save();uc.fillStyle=si.g+Math.floor(p*50).toString(16).padStart(2,'0');
+    uc.beginPath();uc.arc(sp.x,sp.y,11+p*5,0,Math.PI*2);uc.fill();uc.restore()}
+  if(s.st)document.getElementById('sT').textContent=((Date.now()-s.st)/1000).toFixed(1)+'s';
+  // Progress across all strokes
+  const totalPts=s.strokes.reduce((sum,st)=>sum+st.length,0);
+  const donePts=s.strokes.slice(0,s.strokeIdx).reduce((sum,st)=>sum+st.length,0)+s.pi;
+  document.getElementById('gF').style.width=Math.min(100,(donePts/totalPts)*100)+'%';
+  if(cSt.t===CT.TRACE)af=requestAnimationFrame(animTr)}
 
 /* ═══ STEADY ═══ */
 // Universal difficulty 0.0 (easiest) to 1.0 (hardest) based on card threshold
@@ -623,7 +617,7 @@ function startSteady(){
   // Approach time: how long the ring takes to shrink down (shorter=harder)
   const approachMs=Math.round(1400-d*700+Math.max(0,dexMod)*40); // 1400ms easy → 700ms hard
   // Hit window: ms tolerance around perfect timing
-  const hitWindow=Math.round(200-d*120+Math.max(0,dexMod)*15); // 200ms easy → 80ms hard
+  const hitWindow=Math.round(120-d*70+Math.max(0,dexMod)*8); // 120ms easy → 50ms hard
   // Circle visual radius
   const circR=Math.round(24-d*10+Math.max(0,dexMod)*1.5); // 24px easy → 14px hard
   
@@ -1006,28 +1000,36 @@ function animLk(){
   uc.stroke();
   uc.shadowBlur=0;
   
-  // Needle — single line from center through ring to tip
-  const needleW=Math.max(5,ringW*.22);
-  const tipR=R+ringW*.8;
+  // Needle
+  const needleW=Math.max(4,ringW*.18);
   const nx=Math.cos(s.ang),ny=Math.sin(s.ang);
-  const tipX=cx+nx*tipR,tipY=cy+ny*tipR;
-  
-  // Full shaft from center to tip base
-  uc.beginPath();uc.moveTo(cx,cy);uc.lineTo(tipX,tipY);
-  uc.lineWidth=needleW;uc.lineCap='round';
-  uc.strokeStyle='rgba(245,246,248,.9)';uc.stroke();
-  
-  // Arrowhead at tip
-  const aLen=ringW*.5;
-  const aHalf=ringW*.3;
   const px=-ny,py=nx;
-  const abx=tipX-nx*aLen,aby=tipY-ny*aLen;
+  
+  // Arrowhead geometry — sits on the ring
+  const arrowTipR=R+ringW*.7;  // tip past outer ring edge
+  const arrowBaseR=R-ringW*.3; // base inside inner ring edge
+  const arrowW=ringW*.45;       // half-width of arrowhead base
+  const tipX=cx+nx*arrowTipR,tipY=cy+ny*arrowTipR;
+  const abX=cx+nx*arrowBaseR,abY=cy+ny*arrowBaseR;
+  
+  // Shaft: thin line from center, stops SHORT of arrowhead base
+  const shaftEndR=arrowBaseR-ringW*.2;
   uc.beginPath();
-  uc.moveTo(tipX+nx*2,tipY+ny*2);
-  uc.lineTo(abx+px*aHalf,aby+py*aHalf);
-  uc.lineTo(abx-px*aHalf,aby-py*aHalf);
+  uc.moveTo(cx+nx*ringW*.3,cy+ny*ringW*.3); // start slightly away from center
+  uc.lineTo(cx+nx*shaftEndR,cy+ny*shaftEndR);
+  uc.lineWidth=needleW;
+  uc.lineCap='butt';
+  uc.strokeStyle='rgba(240,240,245,.8)';
+  uc.stroke();
+  
+  // Arrowhead: clean filled triangle, no shaft overlap
+  uc.beginPath();
+  uc.moveTo(tipX,tipY);
+  uc.lineTo(abX+px*arrowW,abY+py*arrowW);
+  uc.lineTo(abX-px*arrowW,abY-py*arrowW);
   uc.closePath();
-  uc.fillStyle='rgba(245,246,248,.95)';uc.fill();
+  uc.fillStyle='rgba(245,246,250,.95)';
+  uc.fill();
   
   // Center hub
   uc.beginPath();uc.arc(cx,cy,needleW*1.5,0,s.TAU);
